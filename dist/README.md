@@ -63,8 +63,10 @@ Here are the optimizations I made:
 ####Part 2: pizza.html
 
 Here are the optimizations I made:
+
 Slider Part:
 * changePizzaSizes queries the pizza container once and calculates the pizza size once (with the findOutSizePx function, which improves the old determineDx) all before the loop.
+
 60 FPS Part:
 * used requestAnimationFrame to decouple the scroll event and the updatePositons
 * change querySelectorAll to getElementsByClassName for the mover class and put it outside of the updatePostions function
