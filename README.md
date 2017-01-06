@@ -1,6 +1,7 @@
 ## Website Performance Optimization portfolio project
 
 The project was about optimization.  I have optimized both parts to this project: 
+
 	1) the initial delivery for the index.html landing page (> 90 pagespeed score)  
 	2) made the pizza.html scroll at 60fps and pizza resize at < 5ms using the slider
 
@@ -8,7 +9,7 @@ The project was about optimization.  I have optimized both parts to this project
 
 I used the build tool Grunt to help optimize my project. To work/edit on my project you will need grunt installed on your computer.
 
-Visit [Grunt](http://gruntjs.com/getting-started for details.) for details.  Here's the gist on its relation to this project:
+Visit [Grunt](http://gruntjs.com/getting-started) for details.  Here's the gist on its relation to this project:
 
 * go to the project's root directory (where you can see a dist folder) and you will find a Gruntfile.js.  It details all the tasks I run.  Run the command 'grunt' (in the root directory)
   and you'll get the post build project in the dist folder.
@@ -59,10 +60,12 @@ Here are the optimizations I made:
 * optimized the images via grunt. I manually resized pizzeria.jpg, but optimized it with grunt like all the other images.
 * inlined critical css
 
-####Part 2: Optimize Frames per Second in pizza.html
+####Part 2: pizza.html
 
 Here are the optimizations I made:
+Slider Part:
 * changePizzaSizes queries the pizza container once and calculates the pizza size once (with the findOutSizePx function, which improves the old determineDx) all before the loop.
+60 FPS Part:
 * used requestAnimationFrame to decouple the scroll event and the updatePositons
 * change querySelectorAll to getElementsByClassName for the mover class and put it outside of the updatePostions function
 * phase numbers in updatePositions were calculated before the loop
@@ -70,5 +73,7 @@ Here are the optimizations I made:
 * made a function called generateDynamicPizzas to generate dynamic number of background pizzas based on window size.  the domcontentloaded and window resize events use this function as an 
   event handler
 * queried the movingPizzas1 just once, before the loop that adds pizzas to it initially
+
+### Thanks!
 
 
