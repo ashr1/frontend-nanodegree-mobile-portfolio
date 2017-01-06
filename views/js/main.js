@@ -421,11 +421,11 @@ var resizePizzas = function(size) {
 
   changeSliderLabel(size);
 
-   // Returns the size difference to change a pizza element from one size to another. Called by changePizzaSlices(size).
-  function determineDx (elem, size) {
-    var oldWidth = elem.offsetWidth;
+   // findOutSizePx replaces the original determineDx function. It is the most direct way to calculate pizza size. Use the size parameter passed in to the 
+   // resizePizzas function, get the percent of window width the size represents, and finally get the pixel value of the size by multiplying the windowwidth (in pixels) by
+   // the size (percent value via the sizeSwitcher function).  No need to compare old and new values like in the original code.
+  function findOutSizePx (size) {
     var windowWidth = document.querySelector("#randomPizzas").offsetWidth;
-    var oldSize = oldWidth / windowWidth;
 
     // Changes the slider value to a percent width
     function sizeSwitcher (size) {
@@ -441,18 +441,23 @@ var resizePizzas = function(size) {
       }
     }
 
-    var newSize = sizeSwitcher(size);
-    var dx = (newSize - oldSize) * windowWidth;
+    // size in pxels of a pizza given the size on the slider
+    var newSizePx = sizeSwitcher(size) * windowWidth + 'px';
 
-    return dx;
+    return newSizePx;
   }
 
   // Iterates through pizza elements on the page and changes their widths
   function changePizzaSizes(size) {
-    for (var i = 0; i < document.querySelectorAll(".randomPizzaContainer").length; i++) {
-      var dx = determineDx(document.querySelectorAll(".randomPizzaContainer")[i], size);
-      var newwidth = (document.querySelectorAll(".randomPizzaContainer")[i].offsetWidth + dx) + 'px';
-      document.querySelectorAll(".randomPizzaContainer")[i].style.width = newwidth;
+    // pizza size needs to be calculated just once because the size for all the pizzas is the same.
+    // no need to calculate size for every pizza separately like in the original code
+    var newSizePx = findOutSizePx(size);
+    // the pizza container only needs to be queried once, not on every iteration of the loop.
+    var allPizzas = document.querySelectorAll(".randomPizzaContainer");  
+
+    for (var i = 0; i < allPizzas.length; i++) {
+      // set the size of the pizza to the size calculated once outside the loop
+      allPizzas[i].style.width = newSizePx;
     }
   }
 
@@ -493,6 +498,32 @@ function logAverageFrame(times) {   // times is the array of User Timing measure
   console.log("Average scripting time to generate last 10 frames: " + sum / 10 + "ms");
 }
 
+// I wanted to use request animation frame (RAF) in order to start js at the start of each frame, to prevent missed frames
+// I used the idea of decoupling scroll events and the animation function from an article titled "Leaner, Meaner, Faster Animations with
+// requestAnimationFrame" by Paul Lewis
+
+// alreadyRAF is a way of preventing calling RAF froom being called when it is already doing work
+// mostRecentScrollPos is way of keeping the latest scroll value from the scroll event. it is key in the decoupling process of event and animation.
+var alreadyRAF = false, mostRecentScrollPos = 0;
+// items is a live node list so it reflects changes in the dom. no need to find it each time updatePositions is called.
+// getelementsbyclass is also faster way of accessing than querselectorall
+var items = document.getElementsByClassName('mover');
+
+// onScroll is the event handler for scroll event. it stores the most recent scrollTop value
+function onScroll(){
+  mostRecentScrollPos = document.body.scrollTop;
+  trytoCallRAF(); // call this function in an attempt to call the RAF
+}
+
+// tries to call RAF (whose callback is our updatePostiions function).  It succeeds in calling RAF if it (RAF) isn't already doing work, fails otherwise.
+function trytoCallRAF(){
+  if(!alreadyRAF){
+    requestAnimationFrame(updatePositions);
+  }
+  alreadyRAF = true;
+}
+
+
 // The following code for sliding background pizzas was pulled from Ilya's demo found at:
 // https://www.igvita.com/slides/2012/devtools-tips-and-tricks/jank-demo.html
 
@@ -501,10 +532,22 @@ function updatePositions() {
   frame++;
   window.performance.mark("mark_start_frame");
 
-  var items = document.querySelectorAll('.mover');
+  alreadyRAF = false; // once updatePositions finishes, request animation frame is free to run again if needed (scrolling is happening) 
+
+  var scrollFromTop = mostRecentScrollPos / 1250;
+  var phase = []; // stores all the phase values since there are only 5 unique values no matter how many pizzas in the background
+
+  // calculates the 5 unique phase values
+  for(var i = 0; i < 5; i++) {
+    phase.push(Math.sin(scrollFromTop + (i % 5)) * 100);
+  }
+
+  // loop through all the pizzas in the background and move them
   for (var i = 0; i < items.length; i++) {
-    var phase = Math.sin((document.body.scrollTop / 1250) + (i % 5));
-    items[i].style.left = items[i].basicLeft + 100 * phase + 'px';
+    // the amount to move horizontally for the current pizza, same as the original code except for the already calculated phase values
+    var horizMovement = items[i].basicLeft + phase[i % 5];
+    // use transform property instead of the original left property to get rid of the need to retrigger layout.
+    items[i].style.transform = "translateX(" + horizMovement + "px)";
   }
 
   // User Timing API to the rescue again. Seriously, it's worth learning.
@@ -517,22 +560,49 @@ function updatePositions() {
   }
 }
 
-// runs updatePositions on scroll
-window.addEventListener('scroll', updatePositions);
+// onScroll is the handler for the scroll event, in order to use request animation frame for our updatePositions function
+window.addEventListener('scroll', onScroll);
 
-// Generates the sliding pizzas when the page loads.
-document.addEventListener('DOMContentLoaded', function() {
-  var cols = 8;
-  var s = 256;
-  for (var i = 0; i < 200; i++) {
+// generateDynamicPizzas is the function that attaches the appropriate number of background pizzas on the page based on the window size.
+// the resize event and the domconentloaded event code looked very similar so I factored it out into this common function
+function generateDynamicPizzas() {
+  //just need to query the parent of all the pizzas just once, not in every iteration of the loop
+  var pizzaHolder = document.querySelector("#movingPizzas1");
+  var s = 256; // basic spacing for the grid of pizzas.
+
+  // dynamic calculation of the number of background pizzas needed according to the window height and width:
+  var cols = Math.floor(window.innerWidth / s) + 2; // number of pizzas that can fit horizontally plus 2 extra
+  var rows = Math.floor(window.innerHeight / s) + 1; // number of pizzas that can fit vertically plus 1 extra
+  var numPizzas = cols * rows; // number of total pizzas by multiplying columns by rows
+
+  for (var i = 0; i < numPizzas; i++) {
     var elem = document.createElement('img');
     elem.className = 'mover';
     elem.src = "images/pizza.png";
     elem.style.height = "100px";
     elem.style.width = "73.333px";
     elem.basicLeft = (i % cols) * s;
+    elem.style.left = 0; /* since I decided to use transform translate in the updatePositons, just set the initial left value for the pizzas
+    otherwise the translateX will be relative to the movingPizzas1 container, which is in the middle of the screen */
     elem.style.top = (Math.floor(i / cols) * s) + 'px';
-    document.querySelector("#movingPizzas1").appendChild(elem);
+    pizzaHolder.appendChild(elem); // append the pizza to the container
   }
+
   updatePositions();
+
+}
+
+window.addEventListener('resize', function(){
+  //upon resizing the window, delete all the pizzas since the number is no longer valid
+  var pizzaHolder = document.querySelector("#movingPizzas1");
+  while(pizzaHolder.firstChild){
+    pizzaHolder.removeChild(pizzaHolder.firstChild);
+  }
+  // call generateDynamicPizzas to put up the appropriate number of pizzas
+  generateDynamicPizzas();
+
 });
+
+/* Generates the sliding pizzas when the page loads by calling generateDynamicPizzas which puts up the appropriate number of pizzas based on
+   the window height and width. */
+document.addEventListener('DOMContentLoaded', generateDynamicPizzas);
